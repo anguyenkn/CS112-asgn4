@@ -18,14 +18,19 @@ print "filename: $filename\n" if $OPTS{'d'};
 open my $infile, "<$filename" or warn "<$filename: $!\n" and next;
 while (defined (my $line = <$infile>)) {
     chomp $line;
+    # (m) is the match operator || capture groups
     # makefile syntax if # (comment) ignore
-    next if $line =~ /^\s*#/;
+    next if $line =~ m/^\s*#/;
     # if macro = value -> put into hashtable (\S+) is the regex pattern to get macro val
-    if ($line =~ /\s*(\S+)\s*=\s+(.+)/) {
+    if ($line =~ m/\s*(\S+)\s*=\s+(.+)/) {
 
     }
     # target ... : prereq
-    elsif ($line =~ /\s*(\S+)\s*:.*/) {
+    elsif ($line =~ m/\s*(\S+)\s*:.*/) {
+
+    }
+    # command (\t)
+    elsif ($line =~ m/\t\s*(.+)/) {
 
     }
 
