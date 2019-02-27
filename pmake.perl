@@ -33,5 +33,13 @@ while (defined (my $line = <$infile>)) {
     elsif ($line =~ m/\t\s*(.+)/) {
 
     }
+    # command (@)
+    elsif ($line =~ m/\t\s*@\s*(.+)/) {
+
+    }
+    # command (-)
+    elsif ($line =~ m/\t\s*-\s*(.t)/) {
+
+    }
 
 }
