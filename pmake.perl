@@ -42,11 +42,14 @@ my %strsignal = (
 );
 
 # init filename if theres no file then filename will be set to Makefile
-my $filename = "Makefile";
-$filename = $ARGV[0] if exists $ARGV[0];
+my $filename = "test0/Makefile";
+my $target = "all";
+$target = $ARGV[0] if exists $ARGV[0];
+
 
 # debugging information
 print "filename: $filename\n" if $OPTS{'d'};
+print "target: $target\n" if $OPTS{'d'};
 
 
 my %macrohash;
@@ -60,7 +63,7 @@ sub fetchhash {
     if (exists $macrohash{$key}) {
       return $macrohash{$key};
     } else {
-      #Time ti do nexted macros!
+      #Time to do nexted macros!
 
       return "BOB"};
 };
@@ -91,7 +94,7 @@ while (defined (my $line = <$infile>)) {
     next if $line =~ m/^\s*#/;
     # if macro = value -> put into hashtable (\S+) is the regex pattern to get macro val
     if ($line =~ m/\s*(\S+)\s*=\s+(.+)/) {
-        print "macro detected: $line\n" if $OPTS{'d'};
+        #print "macro detected: $line\n" if $OPTS{'d'};
         inithash $line;
         #my $key, $value = split '=' $line;
         #my ($key, $val) = split(/\s*=\s*/, $line);
@@ -100,23 +103,30 @@ while (defined (my $line = <$infile>)) {
     # target ... : prereq
     elsif ($line =~ m/\s*(\S+)\s*:.*/) {
         #print "target prereq detected: $line\n" if $OPTS{'d'};
-        my ($target, $deps) = split(/\s*:(\s.*)/, $line);
-        print "target: $target deps: $deps\n";
+        my ($target, $depstring) = split(/\s*(:\s.*)/, $line);
+        $depstring = "" if (not defined $depstring);
+        my @deps = split / /, $depstring;
+        print "target: $target deps: $depstring\n";
     }
     # command (\t)
     elsif ($line =~ m/\t\s*(.+)/) {
         # command @
         if ($line =~ m/\t\s*@\s+(.+)/) {
-            #executecmd $line;
+            #get rid of @ in front of $line
+
+            $line =~ s/@ //;
+            executecmd $line;
             #print "command @ detected: $line\n" if $OPTS{'d'};
         }
         # command -
         elsif ($line =~ m/\t\s*-\s+(.t)/) {
+            print "$line\n";
             #executecmd $line;
             #print "command - detected: $line\n" if $OPTS{'d'};
         }
         #command -> stdout
         else {
+            print "$line\n";
             executecmd $line;
             print "command t detected: $line\n" if $OPTS{'d'};
         }
