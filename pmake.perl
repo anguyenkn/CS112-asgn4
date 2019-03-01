@@ -41,13 +41,7 @@ my %strsignal = (
    31 => "Bad system call",
 );
 
-# init filename if theres no file then filename will be set to Makefile
 my $filename = "Makefile";
-$filename = $ARGV[0] if exists $ARGV[0];
-
-# debugging information
-print "filename: $filename\n" if $OPTS{'d'};
-
 
 my %macrohash;
 
