@@ -51,17 +51,31 @@ print "filename: $filename\n" if $OPTS{'d'};
 
 
 my %macrohash;
-#fn for adding line to hashtable
-sub inithash {
-   my $line = $_[0];
-   my ($key, $val) = split(/\s*=\s*/, $line);
-   print "key: $key val: $val\n" if $OPTS{'d'};
-   $macrohash{$key} = $val;
-   print "$macrohash{$key}\n";
 
+sub fetchhash {
+    my $key = $_[0];
+    #print "fetch hash $key\n";
+    #print "its $macrohash{$key}\n" if exists $macrohash{$key};
+    #return "hi";
+
+    if (exists $macrohash{$key}) {
+      return $macrohash{$key};
+    } else {
+      #Time ti do nexted macros!
+
+      return "BOB"};
 };
 
-
+#fn for adding line to hashtable
+sub inithash {
+    my $line = $_[0];
+    my ($key, $val) = split(/\s*=\s*/, $line);
+    print "key: $key val: $val\n" if $OPTS{'d'};
+    #print"val: $val\n";
+    $val =~ s/\${(\S*)}/fetchhash($1)/eg;
+    #print"next: $val\n";
+    $macrohash{$key} = $val;
+};
 
 
 
@@ -84,7 +98,7 @@ while (defined (my $line = <$infile>)) {
     elsif ($line =~ m/\s*(\S+)\s*:.*/) {
         print "target prereq detected: $line\n" if $OPTS{'d'};
         my ($target, $deps) = split(/\s*:\s(.*)/, $line);
-        print "target: $target deps: $deps\n";
+        print "target: $target deps: $deps\n" if $OPTS{'d'};
     }
     # command (\t)
     elsif ($line =~ m/\t\s*(.+)/) {
@@ -98,5 +112,12 @@ while (defined (my $line = <$infile>)) {
     elsif ($line =~ m/\t\s*-\s*(.t)/) {
         print "command ~ detected: $line\n" if $OPTS{'d'};
     }
-
 }
+#if decoding, print hashtable
+if ($OPTS{'d'}) {
+    print "\nHASTABLE\n\n";
+    my ($k,$v) = (0,0);
+    while ( ($k,$v) = each %macrohash ) {
+        print "$k => $v\n";
+    }
+};
