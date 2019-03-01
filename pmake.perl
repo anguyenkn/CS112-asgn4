@@ -9,7 +9,6 @@ use Getopt::Std;
 my %OPTS;
 getopts("d", \%OPTS);
 
-
 #from sigtoperl.output
 my %strsignal = (
     1 => "Hangup",
@@ -58,12 +57,13 @@ sub inithash {
    print "key: $key val: $val\n" if $OPTS{'d'};
    $macrohash{$key} = $val;
    print "$macrohash{$key}\n";
-
 };
 
-
-
-
+sub executecmd {
+    my $line = $_[0];
+    print "executing command: $line\n" if $OPTS{'d'};
+    system("$line");
+};
 
 # from cat.perl
 open my $infile, "<$filename" or warn "<$filename: $!\n" and next;
@@ -82,21 +82,27 @@ while (defined (my $line = <$infile>)) {
     }
     # target ... : prereq
     elsif ($line =~ m/\s*(\S+)\s*:.*/) {
-        print "target prereq detected: $line\n" if $OPTS{'d'};
-        my ($target, $deps) = split(/\s*:\s(.*)/, $line);
-        print "target: $target deps: $deps\n";
+        #print "target prereq detected: $line\n" if $OPTS{'d'};
+        #my ($target, $deps) = split(/\s*:\s(.*)/, $line);
+        #print "target: $target deps: $deps\n";
     }
     # command (\t)
     elsif ($line =~ m/\t\s*(.+)/) {
-        print "command t detected: $line\n" if $OPTS{'d'};
+        # command @
+        if ($line =~ m/\t\s*@\s+(.+)/) {
+            #executecmd $line;
+            #print "command @ detected: $line\n" if $OPTS{'d'};
+        }
+        # command -
+        elsif ($line =~ m/\t\s*-\s+(.t)/) {
+            #executecmd $line;
+            #print "command - detected: $line\n" if $OPTS{'d'};
+        }
+        #command -> stdout
+        else {
+            executecmd $line;
+            print "command t detected: $line\n" if $OPTS{'d'};
+        }
     }
-    # command (@)
-    elsif ($line =~ m/\t\s*@\s*(.+)/) {
-        print "command @ detected: $line\n" if $OPTS{'d'};
-    }
-    # command (-)
-    elsif ($line =~ m/\t\s*-\s*(.t)/) {
-        print "command ~ detected: $line\n" if $OPTS{'d'};
-    }
-
 }
+close $infile;
