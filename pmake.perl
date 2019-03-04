@@ -85,6 +85,9 @@ sub inithash {
     $macrohash{$key} = $val;
 };
 
+
+
+
 sub executecmd {
     my $line = $_[0];
     #print "executing command: $line\n";
@@ -105,6 +108,31 @@ sub executecmd {
     }
 };
 
+
+sub checkcmd {
+  my $line = $_[0];
+  $line=~ s/\t//;
+  if ($line =~ m/\s*@\s+(.+)/) {
+      #get rid of @ in front of $line
+
+      $line =~ s/@ //;
+      executecmd $line;
+      print "command @ detected: $line\n" if $OPTS{'d'};
+  }
+  # command -
+  elsif ($line =~ m/\s*-\s+(.t)/) {
+      print "$line\n";
+      executecmd $line;
+      print "command - detected: $line\n" if $OPTS{'d'};
+  }
+  #command -> stdout
+  else {
+      print "$line\n";
+      executecmd $line;
+      print "command t detected: $line\n" if $OPTS{'d'};
+  }
+}
+
 # from cat.perl
 open my $infile, "<$filename" or warn "<$filename: $!\n" and next;
 
@@ -124,7 +152,7 @@ while (defined (my $line = <$infile>)) {
         #print "key: $key val: $val\n";
     }
     # target ... : prereq
-    elsif ($line =~ m/\s*(\S+)\s*:.*/) {
+    elsif ($line =~ m/^(\S+)\s*:.*/mg) {
         #print "target prereq detected: $line\n" if $OPTS{'d'};
         my $depstring;
         ($currtarget, $depstring) = split(/\s*(:\s.*)/, $line);
