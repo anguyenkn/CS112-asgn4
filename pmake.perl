@@ -42,20 +42,23 @@ my %strsignal = (
 );
 
 # init filename if theres no file then filename will be set to Makefile
-my $filename = "test5/Makefile";
+my $filename = "test0/Makefile";
 my $target = "all";
 $target = $ARGV[0] if exists $ARGV[0];
 
-
 # debugging information
-print "filename: $filename\n";
-print "global target: $target\n";
+print "filename: $filename\n" if $OPTS{'d'};
+print "global target: $target\n" if $OPTS{'d'};
 
 
 my %macrohash;
-
 my %dephash;
 my %cmdhash;
+my %dephashnonsplit;
+
+my %cmdhashstringed;
+
+my @alltargets;
 
 sub fetchhash {
     my $key = $_[0];
@@ -84,8 +87,22 @@ sub inithash {
 
 sub executecmd {
     my $line = $_[0];
+    #print "executing command: $line\n";
     print "executing command: $line\n" if $OPTS{'d'};
-    system("$line");
+
+    # @ cmd
+    if ($line =~ m/\t\s*@\s+(.+)/) {
+        $line =~ s/@ //;
+        system("$line");
+    }
+    # - cmd
+    elsif ($line =~ m/\t\s*-\s+(.t)/) {
+        $line =~ s/- //;
+    }
+    else {
+        print "Executing: $line\n";
+        system("$line");
+    }
 };
 
 # from cat.perl
@@ -121,40 +138,96 @@ while (defined (my $line = <$infile>)) {
         #these 2 lines clean up the deps and target
         shift @deps;
         $currtarget =~ s/ ://;
-
         @cmds = ();
 
-        print "target: $currtarget  deps: @deps  cmds: @cmds\n" ;
+        push @alltargets, $currtarget;
+        $dephashnonsplit{$currtarget} = $depstring;
+
+        #print "target: $currtarget  deps: @deps  cmds: @cmds\n" ;
         $dephash{$currtarget} = [@deps];
     }
     # command (\t)
     elsif ($line =~ m/\t\s*(.+)/) {
-
         push @cmds, $line;
+        #print "@cmds\n";
         $cmdhash{$currtarget} = [@cmds];
-        # command @
-        if ($line =~ m/\t\s*@\s+(.+)/) {
-            #get rid of @ in front of $line
-
-            $line =~ s/@ //;
-            executecmd $line;
-            #print "command @ detected: $line\n" if $OPTS{'d'};
-        }
-        # command -
-        elsif ($line =~ m/\t\s*-\s+(.t)/) {
-            print "$line\n";
-            #executecmd $line;
-            #print "command - detected: $line\n" if $OPTS{'d'};
-        }
-        #command -> stdout
-        else {
-            print "$line\n";
-            executecmd $line;
-            print "command t detected: $line\n" if $OPTS{'d'};
-        }
+        $cmdhashstringed{$currtarget} = $line;
     }
 }
+
+sub mtime {
+    my @status = stat "@_";
+    return @status ? $status[9] : undef;
+}
+
+sub process {
+    my $currtar = $_[0];
+    #print "$currtar\n";
+    #print "@{$cmdhash{$currtar}} \n";
+    #print "current target: $currtar\n";
+
+    my @deps;
+    if (defined($dephashnonsplit{$currtar})) {
+        my $depstr = $dephashnonsplit{$currtar};
+        $depstr =~ s/: //;
+        @deps = split / /, $depstr;
+    }
+    #print "@deps\n";
+    #https://stackoverflow.com/questions/2601027/how-can-i-check-if-a-file-exists-in-perl
+
+    if (-e($currtar)) { # if its a file
+        print "hello\n";
+    }
+    else {
+        foreach my $singledep (@deps) {
+            my $isTar = 0;
+            foreach my $tar (@alltargets) {
+                if ($singledep eq $tar) {
+                    $isTar = 1;
+                }
+            }
+            if ($isTar) {
+                #print "$isTar\n";
+                process($singledep);
+            }
+            else {
+                my $currcmd = $cmdhashstringed{$currtar};
+                executecmd $currcmd;
+            }
+        }
+        #print "@{ $cmdhash{$currtar} }\n";
+        my $currcmd = $cmdhashstringed{$currtar};
+        executecmd $currcmd;
+    }
+
+
+    # let the above loop create the hash table 
+
+        # command @
+        #if ($line =~ m/\t\s*@\s+(.+)/) {
+            #get rid of @ in front of $line
+
+        #    $line =~ s/@ //;
+        #    executecmd $line;
+            #print "command @ detected: $line\n" if $OPTS{'d'};
+        #}
+        # command -
+        #elsif ($line =~ m/\t\s*-\s+(.t)/) {
+        #    $line =~ s/- //;
+        #    print "$line\n";
+        #    executecmd $line;
+            #print "command - detected: $line\n" if $OPTS{'d'};
+        #}
+        #command -> stdout
+        #else {
+        #    print "$line\n";
+        #    executecmd $line;
+        #    print "command t detected: $line\n" if $OPTS{'d'};
+        #}
+}
 close $infile;
+
+process($alltargets[0]);
 
 #if decoding, print hashtable
 if ($OPTS{'d'}) {
