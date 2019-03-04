@@ -42,7 +42,7 @@ my %strsignal = (
 );
 
 # init filename if theres no file then filename will be set to Makefile
-my $filename = "test5/Makefile";
+my $filename = "test0/Makefile";
 my $target = "all";
 $target = $ARGV[0] if exists $ARGV[0];
 
@@ -82,11 +82,39 @@ sub inithash {
     $macrohash{$key} = $val;
 };
 
+
+
+
 sub executecmd {
     my $line = $_[0];
     print "executing command: $line\n" if $OPTS{'d'};
     system("$line");
 };
+
+
+sub checkcmd {
+  my $line = $_[0];
+  $line=~ s/\t//;
+  if ($line =~ m/\s*@\s+(.+)/) {
+      #get rid of @ in front of $line
+
+      $line =~ s/@ //;
+      executecmd $line;
+      print "command @ detected: $line\n" if $OPTS{'d'};
+  }
+  # command -
+  elsif ($line =~ m/\s*-\s+(.t)/) {
+      print "$line\n";
+      executecmd $line;
+      print "command - detected: $line\n" if $OPTS{'d'};
+  }
+  #command -> stdout
+  else {
+      print "$line\n";
+      executecmd $line;
+      print "command t detected: $line\n" if $OPTS{'d'};
+  }
+}
 
 # from cat.perl
 open my $infile, "<$filename" or warn "<$filename: $!\n" and next;
@@ -107,7 +135,7 @@ while (defined (my $line = <$infile>)) {
         #print "key: $key val: $val\n";
     }
     # target ... : prereq
-    elsif ($line =~ m/\s*(\S+)\s*:.*/) {
+    elsif ($line =~ m/^(\S+)\s*:.*/mg) {
         #print "target prereq detected: $line\n" if $OPTS{'d'};
         my $depstring;
         ($currtarget, $depstring) = split(/\s*(:\s.*)/, $line);
@@ -137,24 +165,50 @@ while (defined (my $line = <$infile>)) {
             #get rid of @ in front of $line
 
             $line =~ s/@ //;
-            executecmd $line;
-            #print "command @ detected: $line\n" if $OPTS{'d'};
+            #executecmd $line;
+            print "command @ detected: $line\n" if $OPTS{'d'};
         }
         # command -
         elsif ($line =~ m/\t\s*-\s+(.t)/) {
-            print "$line\n";
+            #print "$line\n";
             #executecmd $line;
-            #print "command - detected: $line\n" if $OPTS{'d'};
+            print "command - detected: $line\n" if $OPTS{'d'};
         }
         #command -> stdout
         else {
-            print "$line\n";
-            executecmd $line;
+            #print "$line\n";
+            #executecmd $line;
             print "command t detected: $line\n" if $OPTS{'d'};
         }
     }
 }
 close $infile;
+
+
+sub runtarget {
+    my $currtarget = $_[0];
+    #print "runtarget $currtarget\n";
+    my @deps = @{$dephash{$currtarget}};
+    foreach my $i (0 .. $#deps) {
+      my $dep = $deps[$i];
+      #print "dep $i - $dep\n";
+      runtarget ($dep);
+    }
+    my @cmds = @{$cmdhash{$currtarget}};
+    foreach my $i (0 .. $#cmds) {
+      my $cmd = $cmds[$i] // " ";
+      #print "cmd $i - $cmd\n";
+      checkcmd $cmd;
+    }
+}
+
+#begin executing the target
+
+print "start execution of makefile with target $target\n\n";
+
+runtarget $target;
+
+
 
 #if decoding, print hashtable
 if ($OPTS{'d'}) {
