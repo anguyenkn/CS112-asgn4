@@ -64,22 +64,23 @@ my $somethingdone = 0;
 
 sub fetchhash {
     my $key = $_[0];
-    #print "fetch hash $key\n";
+    print "fetch hash $key\n";
     #print "its $macrohash{$key}\n" if exists $macrohash{$key};
     #return "hi";
     if (exists $macrohash{$key}) {
         return $macrohash{$key};
     }
-    elsif ($key eq "$$") {
+    elsif ($key =~ m/\$\$/) {
+        print"hit\n";
         return '$';
     }
     # first file spec. as a prereq
-    elsif ($key eq "$<") {
+    elsif ($key =~ m/\$</) {
         my @deps = $dephash{$target};
         return $deps[0];
     }
     #first file spec. as a target.
-    elsif ($key eq "$@") {
+    elsif ($key =~ m/\@/) {
         foreach my $tar (@alltargets) {
             if (-e $tar) {
                 return $tar;
@@ -88,9 +89,21 @@ sub fetchhash {
     }
     else {
       #Time to do nexted macros!
-      return "BOB"
+      return $key;
     };
 };
+
+sub macrosub {
+  my $line = $_[0];
+  print "pre  $line\n";
+  $line =~ s/\${(\S*)}/fetchhash($1)/eg;
+  print "mid  $line\n";
+  $line =~ s/(\$.)/fetchhash($1)/eg;
+  print "post $line\n";
+
+
+  return $line;
+}
 
 #fn for adding line to hashtable
 sub inithash {
@@ -98,7 +111,7 @@ sub inithash {
     my ($key, $val) = split(/\s*=\s*/, $line);
     print "key: $key val: $val\n" if $OPTS{'d'};
     #print"val: $val\n";
-    $val =~ s/\${(\S*)}/fetchhash($1)/eg;
+    $val = macrosub $val;
     #print"next: $val\n";
     $macrohash{$key} = $val;
 };
@@ -108,8 +121,7 @@ sub executecmd {
     my $line = $_[0];
     if (defined $line) {
         $line =~ s/\t//;
-        $line =~ s/\${(\S*)}/fetchhash($1)/eg;
-        $line =~ s/.+(\$\$)/fetchhash($1)/eg;
+        $line = macrosub $line;
         #print "$line\n";
         #print "cmd: $line\n";
         # @ cmd
@@ -160,8 +172,8 @@ while (defined (my $line = <$infile>)) {
         $depstring = "" if (not defined $depstring);
 
         #this regex replaces all macros
-        $depstring =~ s/\${(\S*)}/fetchhash($1)/eg;
-        $currtarget =~ s/\${(\S*)}/fetchhash($1)/eg;
+        $depstring = macrosub $depstring;
+        $currtarget = macrosub $currtarget;
 
 
 
@@ -176,12 +188,12 @@ while (defined (my $line = <$infile>)) {
         $dephashnonsplit{$currtarget} = $depstring;
 
         $istargetcomplete{$currtarget} = 0;
-        #print "target: $currtarget  deps: @deps  cmds: @cmds\n" ;
+        print "target: $currtarget  deps: @deps  cmds: @cmds\n" ;
         $dephash{$currtarget} = [@deps];
     }
     # command (\t)
     elsif ($line =~ m/\t\s*(.+)/) {
-        $line =~ s/\${(\S*)}/fetchhash($1)/eg;
+        $line = macrosub $line;
         push @cmds, $line;
         #print "@cmds\n";
         $cmdhash{$currtarget} = [@cmds];
@@ -210,7 +222,7 @@ sub mtime ($) {
 sub process {
     my $currtar = $_[0];
     #print "@{$cmdhash{$currtar}} \n";
-    #print "current target: $currtar\n";
+    print "current target: $currtar ";
     if ($istargetcomplete{$currtar} == 0) {
         my @deps;
         if (defined($dephashnonsplit{$currtar})) {
@@ -218,6 +230,8 @@ sub process {
             $depstr =~ s/: //;
             @deps = split ' ', $depstr;
         }
+
+        print "deps: @deps\n";
         #https://stackoverflow.com/questions/2601027/how-can-i-check-if-a-file-exists-in-perl
         if (-e $currtar) { # if its a file
             foreach my $singledep (@deps) {
