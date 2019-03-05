@@ -89,6 +89,8 @@ sub inithash {
 sub executecmd {
     my $line = $_[0];
     if (defined $line) {
+        $line =~ s/\${(\S*)}/fetchhash($1)/eg;
+        #print "$line\n";
         #print "cmd: $line\n";
         # @ cmd
         if ($line =~ m/\s*@\s+(.+)/) {
@@ -134,6 +136,7 @@ while (defined (my $line = <$infile>)) {
         #this regex replaces all macros
         $depstring =~ s/\${(\S*)}/fetchhash($1)/eg;
         $currtarget =~ s/\${(\S*)}/fetchhash($1)/eg;
+
 
         my @deps = split / /, $depstring;
         #these 2 lines clean up the deps and target
