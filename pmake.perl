@@ -42,9 +42,8 @@ my %strsignal = (
 );
 
 # init filename if theres no file then filename will be set to Makefile
-my $filename = "test0/Makefile";
-my $target = "all";
-$target = $ARGV[0] if exists $ARGV[0];
+my $filename = "Makefile";
+my $target = exists $ARGV[0] ? $ARGV[0] : undef;
 
 # debugging information
 print "filename: $filename\n" if $OPTS{'d'};
@@ -90,20 +89,22 @@ sub inithash {
 
 sub executecmd {
     my $line = $_[0];
+    $line=~ s/\t//;
     #print "executing command: $line\n";
     print "executing command: $line\n" if $OPTS{'d'};
 
     # @ cmd
-    if ($line =~ m/\t\s*@\s+(.+)/) {
+    if ($line =~ m/\s*@\s+(.+)/) {
         $line =~ s/@ //;
         system("$line");
     }
     # - cmd
-    elsif ($line =~ m/\t\s*-\s+(.t)/) {
+    elsif ($line =~ m/\s*-\s+(.+)/) {
         $line =~ s/- //;
+        print "$line\n";
     }
     else {
-        print "Executing: $line\n";
+        print "$line\n";
         system("$line");
     }
 };
@@ -192,7 +193,7 @@ sub process {
     my $currtar = $_[0];
     #print "$currtar\n";
     #print "@{$cmdhash{$currtar}} \n";
-    #print "current target: $currtar\n";
+    print "current target: $currtar\n";
 
     my @deps;
     if (defined($dephashnonsplit{$currtar})) {
@@ -205,6 +206,8 @@ sub process {
 
     if (-e($currtar)) { # if its a file
         print "hello\n";
+        my $tartime = mtime $currtar;
+        print "$tartime\n";
     }
     else {
         foreach my $singledep (@deps) {
@@ -229,7 +232,7 @@ sub process {
     }
 
 
-    # let the above loop create the hash table 
+    # let the above loop create the hash table
 
         # command @
         #if ($line =~ m/\t\s*@\s+(.+)/) {
@@ -255,7 +258,12 @@ sub process {
 }
 close $infile;
 
-process($alltargets[0]);
+if (not $target) {
+  $target = $alltargets[0];
+}
+print "global target: $target\n";
+process($target);
+
 
 #if decoding, print hashtable
 if ($OPTS{'d'}) {
