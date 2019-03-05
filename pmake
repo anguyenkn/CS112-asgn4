@@ -150,7 +150,8 @@ while (defined (my $line = <$infile>)) {
     # (m) is the match operator || capture groups
     # makefile syntax if # (comment) ignore
     next if $line =~ m/^\s*#/;
-    # if macro = value -> put into hashtable (\S+) is the regex pattern to get macro val
+    # if macro = value ->
+    #put into hashtable (\S+) is the regex pattern to get macro val
     if ($line =~ m/\s*(\S+)\s*=\s+(.+)/ && $line !~ /\t\s*.+/) {
         print "macro detected: $line\n" if $OPTS{'d'};
         inithash $line;
@@ -177,7 +178,7 @@ while (defined (my $line = <$infile>)) {
         $dephashnonsplit{$currtarget} = $depstring;
 
         $istargetcomplete{$currtarget} = 0;
-        print "target: $currtarget  deps: @deps  cmds: @cmds\n" if $OPTS{'d'} ;
+        print "target: $currtarget cmds: @cmds\n" if $OPTS{'d'} ;
         $dephash{$currtarget} = [@deps];
     }
     # command (\t)
@@ -245,7 +246,7 @@ sub handlewildcard {
             #print "$getwildcard\n";
             my @wildcardcmdarr = @{$cmdhash{$getwildcard}};
             my @getwildcarddeps = @{$dephash{$getwildcard}};
-            
+
             #print "@getwildcarddeps\n";
             #print "$getwildcarddeps\n";
             #print "$dep\n";
@@ -299,7 +300,7 @@ sub process {
         }
 
         #rint "deps: @deps\n";
-        #https://stackoverflow.com/questions/2601027/how-can-i-check-if-a-file-exists-in-perl
+        #https://stackoverflow.com/questions/2601027/
         if (-e $currtar) { # if its a file
             foreach my $singledep (@deps) {
                 handlewildcard $singledep;
@@ -314,7 +315,8 @@ sub process {
                     process($singledep);
                 }
                 # target is obsolete
-                elsif ((-e $singledep) && (mtime($currtar) < mtime($singledep))) {
+                elsif (-e $singledep)) {
+                  if (mtime($currtar) < mtime($singledep)) {
                     my @currcmdarr;
                     my $length;
                     if (defined $cmdhash{$currtar}) {
@@ -323,7 +325,7 @@ sub process {
                     }
                     if ($length > 1) {
                         foreach my $thiscmd (@currcmdarr) {
-                            executecmd $thiscmd;                    
+                            executecmd $thiscmd;
                         }
                     }
                     else {
@@ -332,6 +334,7 @@ sub process {
                         executecmd $currcmd;
                     }
                     $somethingdone = 1;
+                  }
                 }
             }
         }
@@ -359,7 +362,7 @@ sub process {
             }
             if ($length > 1) {
                 foreach my $thiscmd (@currcmdarr) {
-                    executecmd $thiscmd;                    
+                    executecmd $thiscmd;
                 }
             }
             else {
