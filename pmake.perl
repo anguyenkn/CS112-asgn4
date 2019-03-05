@@ -55,6 +55,7 @@ my %macrohash;
 my %dephash;
 my %cmdhash;
 
+#
 my %dephashnonsplit;
 my %cmdhashstringed;
 
@@ -66,12 +67,29 @@ sub fetchhash {
     #print "fetch hash $key\n";
     #print "its $macrohash{$key}\n" if exists $macrohash{$key};
     #return "hi";
-
     if (exists $macrohash{$key}) {
-      return $macrohash{$key};
-    } else {
+        return $macrohash{$key};
+    }
+    elsif ($key eq "$$") {
+        return '$';
+    }
+    # first file spec. as a prereq
+    elsif ($key eq "$<") {
+        my @deps = $dephash{$target};
+        return $deps[0];  
+    }
+    #first file spec. as a target.
+    elsif ($key eq "$@") {
+        foreach my $tar (@alltargets) {
+            if (-e $tar) {
+                return $tar;
+            }
+        }
+    } 
+    else {
       #Time to do nexted macros!
-      return "BOB"};
+      return "BOB"
+    };
 };
 
 #fn for adding line to hashtable
@@ -90,6 +108,7 @@ sub executecmd {
     my $line = $_[0];
     if (defined $line) {
         $line =~ s/\${(\S*)}/fetchhash($1)/eg;
+        $line =~ s/.+(\$\$)/fetchhash($1)/eg;
         #print "$line\n";
         #print "cmd: $line\n";
         # @ cmd
@@ -119,7 +138,7 @@ while (defined (my $line = <$infile>)) {
     # makefile syntax if # (comment) ignore
     next if $line =~ m/^\s*#/;
     # if macro = value -> put into hashtable (\S+) is the regex pattern to get macro val
-    if ($line =~ m/\s*(\S+)\s*=\s+(.+)/) {
+    if ($line =~ m/\s*(\S+)\s*=\s+(.+)/ && $line !~ /\t\s*.+/) {
         #print "macro detected: $line\n" if $OPTS{'d'};
         inithash $line;
         #my $key, $value = split '=' $line;
@@ -136,6 +155,8 @@ while (defined (my $line = <$infile>)) {
         #this regex replaces all macros
         $depstring =~ s/\${(\S*)}/fetchhash($1)/eg;
         $currtarget =~ s/\${(\S*)}/fetchhash($1)/eg;
+
+
 
 
         my @deps = split / /, $depstring;
@@ -158,6 +179,18 @@ while (defined (my $line = <$infile>)) {
         $cmdhash{$currtarget} = [@cmds];
         $cmdhashstringed{$currtarget} = $line;
     }
+}
+
+sub handlewildcard {
+    my $tar;
+    foreach my $k (keys %dephash) {
+        if ($k =~ m/%(.+)/) {
+            $tar = $1;
+        }
+    }
+    my $dep = $_[0];
+    $dep =~ m/%(.+)/;
+
 }
 
 sub mtime ($) {
@@ -204,6 +237,7 @@ sub process {
                     if ($singledep eq $tar) {
                         $isTar = 1;
                     }
+                    print "$singledep : $tar\n";
                 }
                 if ($isTar) {
                     #print "$singledep\n";
@@ -218,6 +252,7 @@ sub process {
 }
 close $infile;
 
+handlepercent;
 process($target);
 
 #if decoding, print hashtable
@@ -238,4 +273,6 @@ if ($OPTS{'d'}) {
     print "$k: @{ $cmdhash{$k} }\n";
     }
     print "\n End CMD HASHTABLE\n\n";
+    print "TARGETS\n";
+    print "\n@alltargets\n";
 };
