@@ -43,8 +43,7 @@ my %strsignal = (
 
 # init filename if theres no file then filename will be set to Makefile
 my $filename = "Makefile";
-my $target = "all";
-$target = $ARGV[0] if exists $ARGV[0];
+my $target = exists $ARGV[0] ? $ARGV[0] : undef;
 
 # debugging information
 print "filename: $filename\n" if $OPTS{'d'};
@@ -117,8 +116,8 @@ sub executecmd {
         }
         # - cmd
         elsif ($line =~ m/\s*-\s+(.+)/) {
-            $line =~ s/- //;    
-            print "command: $line\n";       
+            $line =~ s/- //;
+            print "command: $line\n";
         }
         else {
             print "command: $line\n";
@@ -248,12 +247,40 @@ sub process {
             executecmd $currcmd;
         }
     }
-    $istargetcomplete{$currtar} = 1;
+
+
+    # let the above loop create the hash table
+
+        # command @
+        #if ($line =~ m/\t\s*@\s+(.+)/) {
+            #get rid of @ in front of $line
+
+        #    $line =~ s/@ //;
+        #    executecmd $line;
+            #print "command @ detected: $line\n" if $OPTS{'d'};
+        #}
+        # command -
+        #elsif ($line =~ m/\t\s*-\s+(.t)/) {
+        #    $line =~ s/- //;
+        #    print "$line\n";
+        #    executecmd $line;
+            #print "command - detected: $line\n" if $OPTS{'d'};
+        #}
+        #command -> stdout
+        #else {
+        #    print "$line\n";
+        #    executecmd $line;
+        #    print "command t detected: $line\n" if $OPTS{'d'};
+        #}
 }
 close $infile;
 
-handlepercent;
+if (not $target) {
+  $target = $alltargets[0];
+}
+print "global target: $target\n";
 process($target);
+
 
 #if decoding, print hashtable
 if ($OPTS{'d'}) {
