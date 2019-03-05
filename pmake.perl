@@ -60,6 +60,7 @@ my %cmdhashstringed;
 
 my %istargetcomplete;
 my @alltargets;
+my $somethingdone = 0;
 
 sub fetchhash {
     my $key = $_[0];
@@ -75,7 +76,7 @@ sub fetchhash {
     # first file spec. as a prereq
     elsif ($key eq "$<") {
         my @deps = $dephash{$target};
-        return $deps[0];  
+        return $deps[0];
     }
     #first file spec. as a target.
     elsif ($key eq "$@") {
@@ -84,7 +85,7 @@ sub fetchhash {
                 return $tar;
             }
         }
-    } 
+    }
     else {
       #Time to do nexted macros!
       return "BOB"
@@ -106,6 +107,7 @@ sub inithash {
 sub executecmd {
     my $line = $_[0];
     if (defined $line) {
+        $line =~ s/\t//;
         $line =~ s/\${(\S*)}/fetchhash($1)/eg;
         $line =~ s/.+(\$\$)/fetchhash($1)/eg;
         #print "$line\n";
@@ -115,14 +117,20 @@ sub executecmd {
             $line =~ s/@ //;
         }
         # - cmd
-        elsif ($line =~ m/\s*-\s+(.+)/) {
+        elsif ($line =~ m/^\s*-\s+(.+)/gm) {
             $line =~ s/- //;
-            print "command: $line\n";
+            print "$line\n";
         }
         else {
-            print "command: $line\n";
+            print "$line\n";
         }
         system("$line");
+        my $term_signal = $? & 0x7F;
+        my $core_dumped = $? & 0x80;
+        my $exit_status = ($? >> 8) & 0xFF;
+        #print "term signal $term_signal\n";
+        #print "core dumped $core_dumped\n";
+        #print "exit status  $exit_status\n";
     }
 }
 
@@ -173,6 +181,7 @@ while (defined (my $line = <$infile>)) {
     }
     # command (\t)
     elsif ($line =~ m/\t\s*(.+)/) {
+        $line =~ s/\${(\S*)}/fetchhash($1)/eg;
         push @cmds, $line;
         #print "@cmds\n";
         $cmdhash{$currtarget} = [@cmds];
@@ -226,6 +235,7 @@ sub process {
                 elsif ((-e $singledep) && (mtime($currtar) < mtime($singledep))) {
                     my $currcmd = $cmdhashstringed{$currtar};
                     executecmd $currcmd;
+                    $somethingdone = 1;
                 }
             }
         }
@@ -236,7 +246,7 @@ sub process {
                     if ($singledep eq $tar) {
                         $isTar = 1;
                     }
-                    print "$singledep : $tar\n";
+                    #print "$singledep : $tar\n";
                 }
                 if ($isTar) {
                     #print "$singledep\n";
@@ -245,6 +255,7 @@ sub process {
             }
             my $currcmd = $cmdhashstringed{$currtar};
             executecmd $currcmd;
+            $somethingdone = 1;
         }
     }
 
@@ -280,6 +291,9 @@ if (not $target) {
 }
 print "global target: $target\n";
 process($target);
+if (not $somethingdone) {
+  print "pmake: '$target' is up to date.\n";
+}
 
 
 #if decoding, print hashtable
