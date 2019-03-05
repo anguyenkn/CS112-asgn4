@@ -117,12 +117,12 @@ sub inithash {
 
 sub executecmd {
     my $line = $_[0];
-    print "$line\n";
     if (defined $line) {
         $line =~ s/\t//;
         $line = macrosub $line;
         #print "$line\n";
         #print "cmd: $line\n";
+        print "$line\n";
         # @ cmd
         if ($line =~ m/\s*@\s+(.+)/) {
             $line =~ s/@ //;
@@ -227,7 +227,7 @@ sub handlewildcard {
                         $tarname = $1;
                     }
                     my $newtar = $tarname . $tar;
-                    #print "$newtar\n";
+                    push @alltargets, $newtar;
                     $wildcardpreq[0] =~ s/^.//;
                     my $newpreq = $tarname . $wildcardpreq[0];
                     #print "$newpreq\n";
@@ -311,6 +311,7 @@ sub process {
         #https://stackoverflow.com/questions/2601027/how-can-i-check-if-a-file-exists-in-perl
         if (-e $currtar) { # if its a file
             foreach my $singledep (@deps) {
+                handlewildcard $singledep;
                 # check to see if its a target and if it is then process
                 my $isTar = 0;
                 foreach my $tar (@alltargets) {
@@ -318,7 +319,6 @@ sub process {
                         $isTar = 1;
                     }
                 }
-                handlewildcard $singledep;
                 if ($isTar) {
                     process($singledep);
                 }
@@ -330,11 +330,8 @@ sub process {
                         @currcmdarr = @{$cmdhash{$currtar}};
                         $length = @{$cmdhash{$currtar}};
                     }
-                    print "$length\n";
                     if ($length > 1) {
-                        print "$length\n";
                         foreach my $thiscmd (@currcmdarr) {
-                            print "$thiscmd\n";
                             executecmd $thiscmd;                    
                         }
                     }
@@ -349,6 +346,7 @@ sub process {
         }
         else { #not a file
             foreach my $singledep (@deps) {
+                handlewildcard $singledep;
                 my $isTar = 0;
                 foreach my $tar (@alltargets) {
                     if ($singledep eq $tar) {
@@ -368,11 +366,8 @@ sub process {
                 @currcmdarr = @{$cmdhash{$currtar}};
                 $length = @{$cmdhash{$currtar}};
             }
-            print "$length\n";
             if ($length > 1) {
-                print "$length\n";
                 foreach my $thiscmd (@currcmdarr) {
-                    print "$thiscmd\n";
                     executecmd $thiscmd;                    
                 }
             }
