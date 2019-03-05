@@ -64,14 +64,13 @@ my $somethingdone = 0;
 
 sub fetchhash {
     my $key = $_[0];
-    print "fetch hash $key\n";
+    #print "fetch hash $key\n";
     #print "its $macrohash{$key}\n" if exists $macrohash{$key};
     #return "hi";
     if (exists $macrohash{$key}) {
         return $macrohash{$key};
     }
     elsif ($key =~ m/\$\$/) {
-        print"hit\n";
         return '$';
     }
     # first file spec. as a prereq
@@ -94,15 +93,14 @@ sub fetchhash {
 };
 
 sub macrosub {
-  my $line = $_[0];
-  print "pre  $line\n";
-  $line =~ s/\${(\S*)}/fetchhash($1)/eg;
-  print "mid  $line\n";
-  $line =~ s/(\$.)/fetchhash($1)/eg;
-  print "post $line\n";
-
-
-  return $line;
+    my $line = $_[0];
+    #print "pre  $line\n";
+    $line =~ s/\${(\S*)}/fetchhash($1)/eg;
+    #print "mid  $line\n";
+    $line =~ s/(\$\$)/fetchhash($1)/eg;
+    #print "post $line\n";
+    #$line =~ s/(\$<)/fetchhash($1)/eg;
+    return $line;
 }
 
 #fn for adding line to hashtable
@@ -176,8 +174,6 @@ while (defined (my $line = <$infile>)) {
         $currtarget = macrosub $currtarget;
 
 
-
-
         my @deps = split / /, $depstring;
         #these 2 lines clean up the deps and target
         shift @deps;
@@ -188,30 +184,65 @@ while (defined (my $line = <$infile>)) {
         $dephashnonsplit{$currtarget} = $depstring;
 
         $istargetcomplete{$currtarget} = 0;
-        print "target: $currtarget  deps: @deps  cmds: @cmds\n" ;
+        #print "target: $currtarget  deps: @deps  cmds: @cmds\n" ;
         $dephash{$currtarget} = [@deps];
     }
     # command (\t)
     elsif ($line =~ m/\t\s*(.+)/) {
         $line = macrosub $line;
         push @cmds, $line;
-        #print "@cmds\n";
         $cmdhash{$currtarget} = [@cmds];
         $cmdhashstringed{$currtarget} = $line;
     }
 }
 
 sub handlewildcard {
+    my $dep = $_[0];
+    my $regextar;
     my $tar;
+    #print "$dep\n";
     foreach my $k (keys %dephash) {
         if ($k =~ m/%(.+)/) {
             $tar = $1;
         }
     }
-    my $dep = $_[0];
-    $dep =~ m/%(.+)/;
+    $regextar = "\\" . $tar;
+    #print "$tar\n";
+    if ($dep =~ m/.+($regextar)$/) {
+        my $getwildcard = "%" . $tar;
+        my @wildcardcmdarr = @{$cmdhash{$getwildcard}};
+        my @getwildcarddeps = @{$dephash{$getwildcard}};
+        
+        #print "@getwildcarddeps\n";
+        #print "$getwildcarddeps\n";
+        #print "$dep\n";
 
+        $getwildcarddeps[0] =~ s/^.//;
+        #print "$getwildcarddeps[0]\n";
+
+        my @currdeps = @{$dephash{$dep}};
+        my $depprereq;
+
+        foreach my $thisdep (@currdeps) {
+            if ($thisdep =~ m/.+($getwildcarddeps[0])/) {
+                $depprereq = $thisdep;
+            }
+        }
+        foreach my $str (@wildcardcmdarr) {
+            $str =~ s/\$\</$depprereq/;
+        }
+        #print "$depprereq\n";
+        my $newstring = join ' ', @wildcardcmdarr;
+        #print "$newstring\n";
+        $dephashnonsplit{$dep} = $depprereq;
+        $cmdhashstringed{$dep} = $newstring;
+
+        #print "$dephashnonsplit{$dep}\n";
+
+    }
+    #print "$tar\n";
 }
+
 
 sub mtime ($) {
    my ($filename) = @_;
@@ -222,7 +253,7 @@ sub mtime ($) {
 sub process {
     my $currtar = $_[0];
     #print "@{$cmdhash{$currtar}} \n";
-    print "current target: $currtar ";
+    #print "current target: $currtar ";
     if ($istargetcomplete{$currtar} == 0) {
         my @deps;
         if (defined($dephashnonsplit{$currtar})) {
@@ -231,7 +262,7 @@ sub process {
             @deps = split ' ', $depstr;
         }
 
-        print "deps: @deps\n";
+        #rint "deps: @deps\n";
         #https://stackoverflow.com/questions/2601027/how-can-i-check-if-a-file-exists-in-perl
         if (-e $currtar) { # if its a file
             foreach my $singledep (@deps) {
@@ -242,6 +273,7 @@ sub process {
                         $isTar = 1;
                     }
                 }
+                handlewildcard $singledep;
                 if ($isTar) {
                     process($singledep);
                 }
@@ -262,6 +294,7 @@ sub process {
                     }
                     #print "$singledep : $tar\n";
                 }
+                handlewildcard $singledep;
                 if ($isTar) {
                     #print "$singledep\n";
                     process($singledep);
@@ -272,41 +305,17 @@ sub process {
             $somethingdone = 1;
         }
     }
-
-
-    # let the above loop create the hash table
-
-        # command @
-        #if ($line =~ m/\t\s*@\s+(.+)/) {
-            #get rid of @ in front of $line
-
-        #    $line =~ s/@ //;
-        #    executecmd $line;
-            #print "command @ detected: $line\n" if $OPTS{'d'};
-        #}
-        # command -
-        #elsif ($line =~ m/\t\s*-\s+(.t)/) {
-        #    $line =~ s/- //;
-        #    print "$line\n";
-        #    executecmd $line;
-            #print "command - detected: $line\n" if $OPTS{'d'};
-        #}
-        #command -> stdout
-        #else {
-        #    print "$line\n";
-        #    executecmd $line;
-        #    print "command t detected: $line\n" if $OPTS{'d'};
-        #}
+    $istargetcomplete{$currtar} = 1;
 }
 close $infile;
 
 if (not $target) {
   $target = $alltargets[0];
 }
-print "global target: $target\n";
+#print "global target: $target\n";
 process($target);
 if (not $somethingdone) {
-  print "pmake: '$target' is up to date.\n";
+  #print "pmake: '$target' is up to date.\n";
 }
 
 
