@@ -117,6 +117,7 @@ sub inithash {
 
 sub executecmd {
     my $line = $_[0];
+    print "$line\n";
     if (defined $line) {
         $line =~ s/\t//;
         $line = macrosub $line;
@@ -129,7 +130,6 @@ sub executecmd {
         # - cmd
         elsif ($line =~ m/^\s*-\s+(.+)/gm) {
             $line =~ s/- //;
-            print "$line\n";
         }
         else {
             print "$line\n";
@@ -191,56 +191,101 @@ while (defined (my $line = <$infile>)) {
     elsif ($line =~ m/\t\s*(.+)/) {
         $line = macrosub $line;
         push @cmds, $line;
+        
         $cmdhash{$currtarget} = [@cmds];
         $cmdhashstringed{$currtarget} = $line;
     }
 }
 
+
 sub handlewildcard {
     my $dep = $_[0];
     my $regextar;
-    my $tar;
+    my $tar = "";
+    my $exists = 0;
     #print "$dep\n";
     foreach my $k (keys %dephash) {
         if ($k =~ m/%(.+)/) {
             $tar = $1;
+            $exists = 1;
         }
     }
-    $regextar = "\\" . $tar;
-    #print "$tar\n";
-    if ($dep =~ m/.+($regextar)$/) {
-        my $getwildcard = "%" . $tar;
-        my @wildcardcmdarr = @{$cmdhash{$getwildcard}};
-        my @getwildcarddeps = @{$dephash{$getwildcard}};
-        
-        #print "@getwildcarddeps\n";
-        #print "$getwildcarddeps\n";
-        #print "$dep\n";
+    if (!defined $dephash{$dep}) {
+        foreach my $macro (keys %macrohash) {
+            my $macroval = $macrohash{$macro};
+            my @macrovalarr = split / /, $macroval;
+            foreach my $val (@macrovalarr) {
+                $regextar = "\\" . $tar;
+                if ($val =~ m/.+($regextar)/) {
+                    my $getwildcard = "%" . $tar;
+                    #print "$getwildcard\n";
+                    my @wildcardpreq = @{$dephash{$getwildcard}};
+                    #print "@wildcardpreq\n";
+                    my @getwccmds = @{$cmdhash{$getwildcard}};
+                    my $tarname = $val;
+                    if ($tarname =~ m/(\S+)\./) {
+                        $tarname = $1;
+                    }
+                    my $newtar = $tarname . $tar;
+                    #print "$newtar\n";
+                    $wildcardpreq[0] =~ s/^.//;
+                    my $newpreq = $tarname . $wildcardpreq[0];
+                    #print "$newpreq\n";
 
-        $getwildcarddeps[0] =~ s/^.//;
-        #print "$getwildcarddeps[0]\n";
-
-        my @currdeps = @{$dephash{$dep}};
-        my $depprereq;
-
-        foreach my $thisdep (@currdeps) {
-            if ($thisdep =~ m/.+($getwildcarddeps[0])/) {
-                $depprereq = $thisdep;
+                    foreach my $cmd (@getwccmds) {
+                        $cmd =~ s/\$\</$newpreq/;
+                    }
+                    $dephashnonsplit{$newtar} = $newpreq;
+                    $cmdhash{$newtar} = [@getwccmds];
+                    #print "@{$cmdhash{$newtar}}\n";
+                    $cmdhashstringed{$newtar} = join ' ', @getwccmds;
+                }
             }
         }
-        foreach my $str (@wildcardcmdarr) {
-            $str =~ s/\$\</$depprereq/;
-        }
-        #print "$depprereq\n";
-        my $newstring = join ' ', @wildcardcmdarr;
-        #print "$newstring\n";
-        $dephashnonsplit{$dep} = $depprereq;
-        $cmdhashstringed{$dep} = $newstring;
-
-        #print "$dephashnonsplit{$dep}\n";
-
     }
-    #print "$tar\n";
+    elsif ($exists) {
+        # make the hashtable
+        #rint "$dep\n";
+        $regextar = "\\" . $tar;
+        #print "$tar\n";
+        if ($dep =~ m/.+($regextar)/) {
+            my $getwildcard = "%" . $tar;
+            #print "$getwildcard\n";
+            my @wildcardcmdarr = @{$cmdhash{$getwildcard}};
+            my @getwildcarddeps = @{$dephash{$getwildcard}};
+            
+            #print "@getwildcarddeps\n";
+            #print "$getwildcarddeps\n";
+            #print "$dep\n";
+
+            $getwildcarddeps[0] =~ s/^.//;
+            #print "$getwildcarddeps[0]\n";
+            my @currdeps;
+
+            if (defined $dephash{$dep}) {
+                @currdeps = @{$dephash{$dep}};
+            }
+            my $depprereq = "";
+
+            foreach my $thisdep (@currdeps) {
+                if ($thisdep =~ m/.+($getwildcarddeps[0])/) {
+                    $depprereq = $thisdep;
+                }
+            }
+            foreach my $str (@wildcardcmdarr) {
+                $str =~ s/\$\</$depprereq/;
+            }
+            #print "$depprereq\n";
+            my $newstring = join ' ', @wildcardcmdarr;
+            #print "$newstring\n";
+            $dephashnonsplit{$dep} = $depprereq;
+            $cmdhashstringed{$dep} = $newstring;
+
+            $cmdhash{$dep} = @wildcardcmdarr;
+            #print "@wildcardcmdarr\n";
+            #print "$dephashnonsplit{$dep}\n";
+        }
+    }
 }
 
 
@@ -279,8 +324,25 @@ sub process {
                 }
                 # target is obsolete
                 elsif ((-e $singledep) && (mtime($currtar) < mtime($singledep))) {
-                    my $currcmd = $cmdhashstringed{$currtar};
-                    executecmd $currcmd;
+                    my @currcmdarr;
+                    my $length;
+                    if (defined $cmdhash{$currtar}) {
+                        @currcmdarr = @{$cmdhash{$currtar}};
+                        $length = @{$cmdhash{$currtar}};
+                    }
+                    print "$length\n";
+                    if ($length > 1) {
+                        print "$length\n";
+                        foreach my $thiscmd (@currcmdarr) {
+                            print "$thiscmd\n";
+                            executecmd $thiscmd;                    
+                        }
+                    }
+                    else {
+                        my $currcmd = $cmdhashstringed{$currtar};
+                        #print "$currcmd\n";
+                        executecmd $currcmd;
+                    }
                     $somethingdone = 1;
                 }
             }
@@ -300,8 +362,25 @@ sub process {
                     process($singledep);
                 }
             }
-            my $currcmd = $cmdhashstringed{$currtar};
-            executecmd $currcmd;
+            my @currcmdarr;
+            my $length = 0;
+            if (defined $cmdhash{$currtar}) {
+                @currcmdarr = @{$cmdhash{$currtar}};
+                $length = @{$cmdhash{$currtar}};
+            }
+            print "$length\n";
+            if ($length > 1) {
+                print "$length\n";
+                foreach my $thiscmd (@currcmdarr) {
+                    print "$thiscmd\n";
+                    executecmd $thiscmd;                    
+                }
+            }
+            else {
+                my $currcmd = $cmdhashstringed{$currtar};
+                #print "$currcmd\n";
+                executecmd $currcmd;
+            }
             $somethingdone = 1;
         }
     }
