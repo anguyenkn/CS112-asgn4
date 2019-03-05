@@ -1,4 +1,6 @@
 #!/usr/bin/perl -w
+# Joseph Nguyen (jnguy243@ucsc.edu)
+# Joshua Tai (jitai@ucsc.edu)
 use strict;
 use warnings;
 
@@ -108,9 +110,7 @@ sub inithash {
     my $line = $_[0];
     my ($key, $val) = split(/\s*=\s*/, $line);
     print "key: $key val: $val\n" if $OPTS{'d'};
-    #print"val: $val\n";
     $val = macrosub $val;
-    #print"next: $val\n";
     $macrohash{$key} = $val;
 };
 
@@ -120,9 +120,7 @@ sub executecmd {
     if (defined $line) {
         $line =~ s/\t//;
         $line = macrosub $line;
-        #print "$line\n";
-        #print "cmd: $line\n";
-        print "$line\n";
+        print "cmd: $line\n" if $OPTS{'d'};
         # @ cmd
         if ($line =~ m/\s*@\s+(.+)/) {
             $line =~ s/@ //;
@@ -130,6 +128,7 @@ sub executecmd {
         # - cmd
         elsif ($line =~ m/^\s*-\s+(.+)/gm) {
             $line =~ s/- //;
+            print "$line\n";
         }
         else {
             print "$line\n";
@@ -138,9 +137,6 @@ sub executecmd {
         my $term_signal = $? & 0x7F;
         my $core_dumped = $? & 0x80;
         my $exit_status = ($? >> 8) & 0xFF;
-        #print "term signal $term_signal\n";
-        #print "core dumped $core_dumped\n";
-        #print "exit status  $exit_status\n";
     }
 }
 
@@ -156,15 +152,12 @@ while (defined (my $line = <$infile>)) {
     next if $line =~ m/^\s*#/;
     # if macro = value -> put into hashtable (\S+) is the regex pattern to get macro val
     if ($line =~ m/\s*(\S+)\s*=\s+(.+)/ && $line !~ /\t\s*.+/) {
-        #print "macro detected: $line\n" if $OPTS{'d'};
+        print "macro detected: $line\n" if $OPTS{'d'};
         inithash $line;
-        #my $key, $value = split '=' $line;
-        #my ($key, $val) = split(/\s*=\s*/, $line);
-        #print "key: $key val: $val\n";
     }
     # target ... : prereq
     elsif ($line =~ m/^(\S+)\s*:.*/mg) {
-        #print "target prereq detected: $line\n" if $OPTS{'d'};
+        print "target prereq detected: $line\n" if $OPTS{'d'};
         my $depstring;
         ($currtarget, $depstring) = split(/\s*(:\s.*)/, $line);
         $depstring = "" if (not defined $depstring);
@@ -184,14 +177,13 @@ while (defined (my $line = <$infile>)) {
         $dephashnonsplit{$currtarget} = $depstring;
 
         $istargetcomplete{$currtarget} = 0;
-        #print "target: $currtarget  deps: @deps  cmds: @cmds\n" ;
+        print "target: $currtarget  deps: @deps  cmds: @cmds\n" if $OPTS{'d'} ;
         $dephash{$currtarget} = [@deps];
     }
     # command (\t)
     elsif ($line =~ m/\t\s*(.+)/) {
         $line = macrosub $line;
         push @cmds, $line;
-        
         $cmdhash{$currtarget} = [@cmds];
         $cmdhashstringed{$currtarget} = $line;
     }
@@ -210,7 +202,7 @@ sub handlewildcard {
             $exists = 1;
         }
     }
-    if (!defined $dephash{$dep}) {
+    if (!defined $dephash{$dep} && $exists) {
         foreach my $macro (keys %macrohash) {
             my $macroval = $macrohash{$macro};
             my @macrovalarr = split / /, $macroval;
@@ -299,7 +291,6 @@ sub process {
     my $currtar = $_[0];
     #print "@{$cmdhash{$currtar}} \n";
     #print "current target: $currtar ";
-    if ($istargetcomplete{$currtar} == 0) {
         my @deps;
         if (defined($dephashnonsplit{$currtar})) {
             my $depstr = $dephashnonsplit{$currtar};
@@ -378,18 +369,16 @@ sub process {
             }
             $somethingdone = 1;
         }
-    }
-    $istargetcomplete{$currtar} = 1;
 }
 close $infile;
 
 if (not $target) {
   $target = $alltargets[0];
 }
-#print "global target: $target\n";
+print "global target: $target\n" if $OPTS{'d'};
 process($target);
 if (not $somethingdone) {
-  #print "pmake: '$target' is up to date.\n";
+  print "pmake: '$target' is up to date.\n";
 }
 
 
