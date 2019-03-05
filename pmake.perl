@@ -53,10 +53,11 @@ print "global target: $target\n" if $OPTS{'d'};
 my %macrohash;
 my %dephash;
 my %cmdhash;
-my %dephashnonsplit;
 
+my %dephashnonsplit;
 my %cmdhashstringed;
 
+my %istargetcomplete;
 my @alltargets;
 
 sub fetchhash {
@@ -69,7 +70,6 @@ sub fetchhash {
       return $macrohash{$key};
     } else {
       #Time to do nexted macros!
-
       return "BOB"};
 };
 
@@ -85,53 +85,26 @@ sub inithash {
 };
 
 
-
-
 sub executecmd {
     my $line = $_[0];
-    $line=~ s/\t//;
-    #print "executing command: $line\n";
-    print "executing command: $line\n" if $OPTS{'d'};
-
-    # @ cmd
-    if ($line =~ m/\s*@\s+(.+)/) {
-        $line =~ s/@ //;
+    if (defined $line) {
+        $line =~ s/\${(\S*)}/fetchhash($1)/eg;
+        #print "$line\n";
+        #print "cmd: $line\n";
+        # @ cmd
+        if ($line =~ m/\s*@\s+(.+)/) {
+            $line =~ s/@ //;
+        }
+        # - cmd
+        elsif ($line =~ m/\s*-\s+(.+)/) {
+            $line =~ s/- //;
+            print "command: $line\n";
+        }
+        else {
+            print "command: $line\n";
+        }
         system("$line");
     }
-    # - cmd
-    elsif ($line =~ m/\s*-\s+(.+)/) {
-        $line =~ s/- //;
-        print "$line\n";
-    }
-    else {
-        print "$line\n";
-        system("$line");
-    }
-};
-
-
-sub checkcmd {
-  my $line = $_[0];
-  $line=~ s/\t//;
-  if ($line =~ m/\s*@\s+(.+)/) {
-      #get rid of @ in front of $line
-
-      $line =~ s/@ //;
-      executecmd $line;
-      print "command @ detected: $line\n" if $OPTS{'d'};
-  }
-  # command -
-  elsif ($line =~ m/\s*-\s+(.t)/) {
-      print "$line\n";
-      executecmd $line;
-      print "command - detected: $line\n" if $OPTS{'d'};
-  }
-  #command -> stdout
-  else {
-      print "$line\n";
-      executecmd $line;
-      print "command t detected: $line\n" if $OPTS{'d'};
-  }
 }
 
 # from cat.perl
@@ -163,6 +136,7 @@ while (defined (my $line = <$infile>)) {
         $depstring =~ s/\${(\S*)}/fetchhash($1)/eg;
         $currtarget =~ s/\${(\S*)}/fetchhash($1)/eg;
 
+
         my @deps = split / /, $depstring;
         #these 2 lines clean up the deps and target
         shift @deps;
@@ -172,6 +146,7 @@ while (defined (my $line = <$infile>)) {
         push @alltargets, $currtarget;
         $dephashnonsplit{$currtarget} = $depstring;
 
+        $istargetcomplete{$currtarget} = 0;
         #print "target: $currtarget  deps: @deps  cmds: @cmds\n" ;
         $dephash{$currtarget} = [@deps];
     }
@@ -184,51 +159,59 @@ while (defined (my $line = <$infile>)) {
     }
 }
 
-sub mtime {
-    my @status = stat "@_";
-    return @status ? $status[9] : undef;
+sub mtime ($) {
+   my ($filename) = @_;
+   my @stat = stat $filename;
+   return @stat ? $stat[9] : undef;
 }
 
 sub process {
     my $currtar = $_[0];
-    #print "$currtar\n";
     #print "@{$cmdhash{$currtar}} \n";
-    print "current target: $currtar\n";
-
-    my @deps;
-    if (defined($dephashnonsplit{$currtar})) {
-        my $depstr = $dephashnonsplit{$currtar};
-        $depstr =~ s/: //;
-        @deps = split / /, $depstr;
-    }
-    #print "@deps\n";
-    #https://stackoverflow.com/questions/2601027/how-can-i-check-if-a-file-exists-in-perl
-
-    if (-e($currtar)) { # if its a file
-        print "hello\n";
-        my $tartime = mtime $currtar;
-        print "$tartime\n";
-    }
-    else {
-        foreach my $singledep (@deps) {
-            my $isTar = 0;
-            foreach my $tar (@alltargets) {
-                if ($singledep eq $tar) {
-                    $isTar = 1;
+    #print "current target: $currtar\n";
+    if ($istargetcomplete{$currtar} == 0) {
+        my @deps;
+        if (defined($dephashnonsplit{$currtar})) {
+            my $depstr = $dephashnonsplit{$currtar};
+            $depstr =~ s/: //;
+            @deps = split ' ', $depstr;
+        }
+        #https://stackoverflow.com/questions/2601027/how-can-i-check-if-a-file-exists-in-perl
+        if (-e $currtar) { # if its a file
+            foreach my $singledep (@deps) {
+                # check to see if its a target and if it is then process
+                my $isTar = 0;
+                foreach my $tar (@alltargets) {
+                    if ($singledep eq $tar) {
+                        $isTar = 1;
+                    }
+                }
+                if ($isTar) {
+                    process($singledep);
+                }
+                # target is obsolete
+                elsif ((-e $singledep) && (mtime($currtar) < mtime($singledep))) {
+                    my $currcmd = $cmdhashstringed{$currtar};
+                    executecmd $currcmd;
                 }
             }
-            if ($isTar) {
-                #print "$isTar\n";
-                process($singledep);
-            }
-            else {
-                my $currcmd = $cmdhashstringed{$currtar};
-                executecmd $currcmd;
-            }
         }
-        #print "@{ $cmdhash{$currtar} }\n";
-        my $currcmd = $cmdhashstringed{$currtar};
-        executecmd $currcmd;
+        else { #not a file
+            foreach my $singledep (@deps) {
+                my $isTar = 0;
+                foreach my $tar (@alltargets) {
+                    if ($singledep eq $tar) {
+                        $isTar = 1;
+                    }
+                }
+                if ($isTar) {
+                    #print "$singledep\n";
+                    process($singledep);
+                }
+            }
+            my $currcmd = $cmdhashstringed{$currtar};
+            executecmd $currcmd;
+        }
     }
 
 
